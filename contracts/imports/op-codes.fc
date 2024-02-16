@@ -1,0 +1,7 @@
+;; Jettons
+const int op::transfer_jetton = 0xf8a7ea5;
+const int op::transfer_notification = 0x7362d09c;
+
+
+const int op::withdraw_jetton = 0xaab4a8ef;
+const int op::add_commission = 0x31deb0eb;
