@@ -107,18 +107,18 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
     (slice dict_value, int success) = storage::users_dict.udict_get?(256, user_id);
 
     ifnot (success){
-        (int last_commision, _, _) = storage::commission_dict.udict_get_prev?(256, time_nft);
-        storage::users_dict.udict_set(256, user_id, begin_cell().store_uint(last_commision, 256).end_cell().begin_parse());
+        (int last_commision, _, _) = storage::commission_dict.udict_get_prev?(32, time_nft);
+        storage::users_dict.udict_set(256, user_id, begin_cell().store_uint(last_commision, 32).end_cell().begin_parse());
     }
 
     (slice dict_value, int success) = storage::users_dict.udict_get?(256, user_id);
-    int last_ptr = dict_value~load_uint(256);
+    int last_ptr = dict_value~load_uint(32);
 
-    (slice commision_dict_value, _) = storage::commission_dict.udict_get?(256, last_ptr);
+    (slice commision_dict_value, _) = storage::commission_dict.udict_get?(32, last_ptr);
 
     int last_sum  = commision_dict_value~load_uint(256); ;; last sum wich user didnt claim
     
-    (slice commision_dict_value, _) = storage::commission_dict.udict_get?(256, storage::last_commission_time);
+    (slice commision_dict_value, _) = storage::commission_dict.udict_get?(32, storage::last_commission_time);
 
     int curr_sum  = commision_dict_value~load_uint(256); ;; current sum
 
@@ -126,7 +126,7 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
 
     send_jettons(query_id, jetton_amount, user, storage::jetton_wallet_address, 0, 64, 1);
 
-    storage::users_dict.udict_set(256, user_id, begin_cell().store_uint(storage::last_commission_time, 256).end_cell().begin_parse());
+    storage::users_dict.udict_set(256, user_id, begin_cell().store_uint(storage::last_commission_time, 32).end_cell().begin_parse());
     save_data();
     
     return ();
@@ -134,14 +134,14 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
 
 () add_commission(int time, int add, int total_in_stake) impure inline {
     ifnot(storage::last_commission_time){
-        storage::commission_dict.udict_set(256, storage::last_commission_time, begin_cell().store_uint(0, 256).end_cell().begin_parse());
+        storage::commission_dict.udict_set(32, storage::last_commission_time, begin_cell().store_uint(0, 256).end_cell().begin_parse());
     }
-    (slice commision_dict_value, _) = storage::commission_dict.udict_get?(256, storage::last_commission_time);
+    (slice commision_dict_value, _) = storage::commission_dict.udict_get?(32, storage::last_commission_time);
 
     int curr_sum  = commision_dict_value~load_uint(256);
 
     storage::last_commission_time = time;
-    storage::commission_dict.udict_set(256, time, begin_cell().store_uint(curr_sum + muldiv(bignumber, add, total_in_stake), 256).end_cell().begin_parse());
+    storage::commission_dict.udict_set(32, time, begin_cell().store_uint(curr_sum + muldiv(bignumber, add, total_in_stake), 256).end_cell().begin_parse());
 
     save_data();
     return ();
@@ -193,7 +193,7 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
         slice ds = in_msg_body~load_ref().begin_parse();
 
         int total_in_stake = ds~load_uint(256);
-        int time = ds~load_uint(256);
+        int time = ds~load_uint(32);
 
         add_commission(time,transferred_jettons, total_in_stake);
 
