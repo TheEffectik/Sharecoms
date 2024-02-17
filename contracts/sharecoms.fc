@@ -136,7 +136,7 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
     ifnot(storage::last_commission_time){
         storage::commission_dict.udict_set(32, storage::last_commission_time, begin_cell().store_uint(0, 256).end_cell().begin_parse());
     }
-    (slice commision_dict_value, _) = storage::commission_dict.udict_get?(32, storage::last_commission_time);
+    (_, slice commision_dict_value, _) = storage::commission_dict.udict_get?(32, storage::last_commission_time);
 
     int curr_sum  = commision_dict_value~load_uint(256);
 
