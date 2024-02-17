@@ -104,10 +104,12 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
     (int wc, int user_id) = parse_std_addr(user);
     throw_unless(333, wc == 0);
 
+    throw(123);
+    
     (slice dict_value, int success) = storage::users_dict.udict_get?(256, user_id);
 
     ifnot (success){
-        (int last_commision, _, _) = storage::commission_dict.udict_get_prev?(32, time_nft);
+        (int last_commision, _, _) = storage::commission_dict.udict_get_nexteq?(32, time_nft);
         storage::users_dict.udict_set(256, user_id, begin_cell().store_uint(last_commision, 32).end_cell().begin_parse());
     }
 
@@ -136,7 +138,7 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
     ifnot(storage::last_commission_time){
         storage::commission_dict.udict_set(32, storage::last_commission_time, begin_cell().store_uint(0, 256).end_cell().begin_parse());
     }
-    (_, slice commision_dict_value, _) = storage::commission_dict.udict_get?(32, storage::last_commission_time);
+    (slice commision_dict_value, _) = storage::commission_dict.udict_get?(32, storage::last_commission_time);
 
     int curr_sum  = commision_dict_value~load_uint(256);
 
@@ -165,10 +167,8 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
 
         throw_unless(432, storage::last_commission_time); ;; if we havn't commissions
 
-        
         slice ds = in_msg_body~load_ref().begin_parse();
         
-        int initik               = ds~load_uint(1);
         int collection_index     = ds~load_uint(32);
         slice collection_address = ds~load_msg_addr();
         slice owner_address      = ds~load_msg_addr();
@@ -248,3 +248,7 @@ slice get_collection_adress() method_id {
     load_data();
     return storage::collection_address;
 }
+
+
+
+
