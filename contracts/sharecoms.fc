@@ -194,6 +194,8 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
 
         int total_in_stake = ds~load_uint(256);
         int time = ds~load_uint(32);
+        
+        throw_if(99, total_in_stake == 0);
 
         add_commission(time,transferred_jettons, total_in_stake);
 
