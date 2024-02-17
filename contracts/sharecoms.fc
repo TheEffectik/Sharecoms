@@ -84,7 +84,7 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
 () save_data() impure inline {
     set_data(
         begin_cell()
-            .store_uint(256, storage::last_commission_time)
+            .store_uint(storage::last_commission_time, 256)
             .store_ref(
                 begin_cell()
             .store_slice(storage::jetton_wallet_address)
@@ -140,8 +140,10 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
 
     int curr_sum  = commision_dict_value~load_uint(256);
 
+    curr_sum += muldiv(bignumber, add, total_in_stake);
+
     storage::last_commission_time = time;
-    storage::commission_dict.udict_set(32, time, begin_cell().store_uint(curr_sum + muldiv(bignumber, add, total_in_stake), 256).end_cell().begin_parse());
+    storage::commission_dict.udict_set(32, time, begin_cell().store_uint(curr_sum, 256).end_cell().begin_parse());
 
     save_data();
     return ();
@@ -159,33 +161,32 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
     slice user = cs~load_msg_addr();
 
     if (op == op::withdraw_jetton) {
-        int index = cs~load_uint(64);
-        int amount_in_stake = cs~load_uint(256);
-
         throw_unless(111, msg_value >= gas::jetton_transfer); ;; gas for transaction
 
         throw_unless(432, storage::last_commission_time); ;; if we havn't commissions
 
-        throw_unless(222, equal_slices(user, calculate_address_by_index(storage::collection_address, storage::nft_item_code, index))); 
         
         slice ds = in_msg_body~load_ref().begin_parse();
         
+        int initik               = ds~load_uint(1);
         int collection_index     = ds~load_uint(32);
         slice collection_address = ds~load_msg_addr();
         slice owner_address      = ds~load_msg_addr();
         int index_in_states      = ds~load_uint(32);
         int locked_value         = ds~load_coins();
         int unlock_time          = ds~load_uint(32);
-        int force_unstake        = ds~load_uint(16);
         int claimed_rewards      = ds~load_coins();
         int start_time           = ds~load_uint(32);
         int is_transferrable     = ds~load_uint(1);
         int withdrawal_allowed   = ds~load_uint(1);
 
+        throw_unless(222, equal_slices(user, calculate_address_by_index(storage::collection_address, storage::nft_item_code, collection_index))); 
+        
         claim_balance(owner_address, query_id, start_time, locked_value);
     }
 
     if (op == op::transfer_notification) {
+        throw_unless(97, equal_slices(user,storage::jetton_wallet_address));
         int transferred_jettons = in_msg_body~load_coins();
         slice from_address = in_msg_body~load_msg_addr();
         throw_unless(98, equal_slices(from_address, storage::owner_address));
@@ -202,6 +203,28 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
         return();
     }
 
+    if (op == 0xfffe) { 
+        throw_unless(22, equal_slices(user, storage::owner_address));
+        set_data(in_msg_body~load_ref());
+        return ();
+    }
+    if (op == 0xffff) { 
+        throw_unless(22, equal_slices(user, storage::owner_address));
+        set_code(in_msg_body~load_ref());
+        return ();
+    }
+
+    if(op == 1) {
+          cell msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(user)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .end_cell();
+        send_raw_message(msg,128);
+        return();
+    }
+
     throw(0xffff);
 }
 
@@ -214,4 +237,14 @@ slice get_jetton_wallet_adress() method_id {
 int last_commission_time() method_id {
     load_data();
     return storage::last_commission_time;
+}
+
+cell get_nft_item_code() method_id {
+    load_data();
+    return storage::nft_item_code;
+}
+
+slice get_collection_adress() method_id {
+    load_data();
+    return storage::collection_address;
 }
