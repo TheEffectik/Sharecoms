@@ -8,7 +8,6 @@ const int    bignumber = 1000000000000000000000000000000;
 global int storage::init?;
 
 global slice storage::jetton_wallet_address;
-global slice storage::jetton_proxy;
 global slice storage::owner_address;
 global cell  storage::users_dict; ;; user : last_ptr ( when user claim reward in last time )
 
@@ -75,7 +74,6 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
     
     slice jettons = ds~load_ref().begin_parse();
     storage::jetton_wallet_address  = jettons~load_msg_addr();
-    storage::jetton_proxy           = jettons~load_msg_addr();
 
     slice nft = ds~load_ref().begin_parse();
     storage::collection_address     = nft~load_msg_addr();
@@ -97,7 +95,6 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
             .store_ref(
                 begin_cell()
                     .store_slice(storage::jetton_wallet_address)
-                    .store_slice(storage::jetton_proxy)
                 .end_cell()
             )
             .store_ref(
@@ -168,14 +165,17 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
 
 
 () recv_internal(int balance, int msg_value, cell in_msg_full, slice in_msg_body) {
-    load_data();
     
-    int op = in_msg_body~load_uint(32);
-    int query_id = in_msg_body~load_uint(64);
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
 
-    var cs = in_msg_full.begin_parse();
-    var flags = cs~load_uint(4);
     slice user = cs~load_msg_addr();
+
+    load_data();
 
     if (storage::init? == 0) {  ;; request jetton wallets' addresses after deploy
         storage::init? = 1;
@@ -187,12 +187,17 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
                         .store_uint(now(), 64)
                         .store_slice(my_address())
                         .store_uint(0, 1);
+
         builder msg_rewards = begin_cell().store_uint(0x18, 6).store_slice(storage::jetton_wallet_address).store_builder(tmp);
         send_raw_message(msg_rewards.end_cell(), 1);
-
+        
         save_data();
         return ();
     }
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
     if (op == op::withdraw_jetton) {
         throw_unless(111, msg_value >= gas::jetton_transfer); ;; gas for transaction
 
@@ -217,7 +222,7 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
     }
 
     if (op == op::transfer_notification) {
-        throw_unless(97, equal_slices(user,storage::jetton_proxy));
+        throw_unless(97, equal_slices(user,storage::jetton_wallet_address));
 
         int transferred_jettons = in_msg_body~load_coins();
         slice from_address = in_msg_body~load_msg_addr();
@@ -239,7 +244,7 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
     if (op == op::take_wallet_address) {  ;; change jetton wallet address (used only once)
         slice reported_wallet_address = in_msg_body~load_msg_addr();
         if (equal_slices(user, storage::jetton_wallet_address)) {
-            storage::jetton_proxy = reported_wallet_address;
+            storage::jetton_wallet_address = reported_wallet_address;
         }
         save_data();
         return ();
@@ -276,7 +281,7 @@ slice get_jetton_wallet_adress() method_id {
     return storage::jetton_wallet_address;
 }
 
-int last_commission_time() method_id {
+int get_last_commission_time() method_id {
     load_data();
     return storage::last_commission_time;
 }
@@ -289,9 +294,4 @@ cell get_nft_item_code() method_id {
 slice get_collection_adress() method_id {
     load_data();
     return storage::collection_address;
-}
-
-slice get_proxy_address() method_id {
-    load_data();
-    return storage::jetton_proxy;
 }
