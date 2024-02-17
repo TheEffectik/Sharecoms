@@ -15,7 +15,6 @@ export function SharecomsConfigToCell(config: SharecomsConfig): Cell { // need t
                 .storeRef(
                     beginCell()
                     .storeAddress(config.jetton_wallet_address)
-                    .storeAddress(config.jetton_wallet_address) 
                     .endCell()
                 )
                 .storeRef(
