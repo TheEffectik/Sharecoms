@@ -1,1 +1,2 @@
 const int gas::jetton_transfer = 55000000;
+const int gas::provide_addr    = 20000000;   ;; 0.02 TON

@@ -5,7 +5,10 @@
 
 const int    bignumber = 1000000000000000000000000000000;
 
+global int storage::init?;
+
 global slice storage::jetton_wallet_address;
+global slice storage::jetton_proxy;
 global slice storage::owner_address;
 global cell  storage::users_dict; ;; user : last_ptr ( when user claim reward in last time )
 
@@ -67,16 +70,21 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
 ;; ------------------------------------------------------
 () load_data() impure inline {
     slice ds = get_data().begin_parse();
-    storage::last_commission_time   = ds~load_uint(256);
+    storage::init?                  = ds~load_uint(1);
+    storage::last_commission_time   = ds~load_uint(32);
     
-    slice ds2 = ds~load_ref().begin_parse();
-    storage::jetton_wallet_address  = ds2~load_msg_addr();
-    storage::owner_address          = ds2~load_msg_addr();
-    storage::collection_address     = ds2~load_msg_addr();
-    storage::nft_item_code          = ds~load_ref();
+    slice jettons = ds~load_ref().begin_parse();
+    storage::jetton_wallet_address  = jettons~load_msg_addr();
+    storage::jetton_proxy           = jettons~load_msg_addr();
+
+    slice nft = ds~load_ref().begin_parse();
+    storage::collection_address     = nft~load_msg_addr();
+    storage::owner_address          = nft~load_msg_addr();
+    storage::nft_item_code          = nft~load_ref();
 
     storage::users_dict             = ds~load_dict();
     storage::commission_dict        = ds~load_dict();
+
     
 }
 
@@ -84,15 +92,21 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
 () save_data() impure inline {
     set_data(
         begin_cell()
-            .store_uint(storage::last_commission_time, 256)
+            .store_uint(storage::init?, 1)
+            .store_uint(storage::last_commission_time, 32)
             .store_ref(
                 begin_cell()
-            .store_slice(storage::jetton_wallet_address)
-            .store_slice(storage::owner_address)
-            .store_slice(storage::collection_address)
+                    .store_slice(storage::jetton_wallet_address)
+                    .store_slice(storage::jetton_proxy)
                 .end_cell()
             )
-            .store_ref(storage::nft_item_code)
+            .store_ref(
+                begin_cell()           
+                    .store_slice(storage::owner_address)
+                    .store_slice(storage::collection_address)
+                    .store_ref(storage::nft_item_code)
+                .end_cell()
+            )
             .store_dict(storage::users_dict)
             .store_dict(storage::commission_dict)
         .end_cell()
@@ -108,13 +122,12 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
 
     ifnot (success){
         (int last_commision, _, _) = storage::commission_dict.udict_get_nexteq?(32, time_nft);
-        storage::users_dict.udict_set(256, user_id, begin_cell().store_uint(last_commision, 32).end_cell().begin_parse());
+        storage::users_dict~udict_set(256, user_id, begin_cell().store_uint(last_commision, 32).end_cell().begin_parse());
     }
 
-    (slice dict_value, _) = storage::users_dict.udict_get?(256, user_id);
-    if(dict_value.slice_empty?()) {
-        throw(100);
-    }
+    (slice dict_value, int success) = storage::users_dict.udict_get?(256, user_id);
+    throw_unless(100, success);
+
     int last_ptr = dict_value~load_uint(32);
     throw(123);
 
@@ -129,7 +142,7 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
     int jetton_amount = muldiv(curr_sum - last_sum, amount_in_stake, bignumber);
     send_jettons(query_id, jetton_amount, user, storage::jetton_wallet_address, 0, 64, 1);
 
-    storage::users_dict.udict_set(256, user_id, begin_cell().store_uint(storage::last_commission_time, 32).end_cell().begin_parse());
+    storage::users_dict~udict_set(256, user_id, begin_cell().store_uint(storage::last_commission_time, 32).end_cell().begin_parse());
     save_data();
     
     return ();
@@ -137,7 +150,8 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
 
 () add_commission(int time, int add, int total_in_stake) impure inline {
     ifnot(storage::last_commission_time){
-        storage::commission_dict.udict_set(32, storage::last_commission_time, begin_cell().store_uint(0, 256).end_cell().begin_parse());
+        storage::commission_dict~udict_set(32, storage::last_commission_time, begin_cell().store_uint(0, 256).end_cell().begin_parse());
+
     }
     (slice commision_dict_value, _) = storage::commission_dict.udict_get?(32, storage::last_commission_time);
 
@@ -146,7 +160,7 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
     curr_sum += muldiv(bignumber, add, total_in_stake);
 
     storage::last_commission_time = time;
-    storage::commission_dict.udict_set(32, time, begin_cell().store_uint(curr_sum, 256).end_cell().begin_parse());
+    storage::commission_dict~udict_set(32, time, begin_cell().store_uint(curr_sum, 256).end_cell().begin_parse());
 
     save_data();
     return ();
@@ -163,6 +177,22 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
     var flags = cs~load_uint(4);
     slice user = cs~load_msg_addr();
 
+    if (storage::init? == 0) {  ;; request jetton wallets' addresses after deploy
+        storage::init? = 1;
+
+        builder tmp = begin_cell()
+                        .store_coins(gas::provide_addr)
+                        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                        .store_uint(op::provide_wallet_address, 32)
+                        .store_uint(now(), 64)
+                        .store_slice(my_address())
+                        .store_uint(0, 1);
+        builder msg_rewards = begin_cell().store_uint(0x18, 6).store_slice(storage::jetton_wallet_address).store_builder(tmp);
+        send_raw_message(msg_rewards.end_cell(), 1);
+
+        save_data();
+        return ();
+    }
     if (op == op::withdraw_jetton) {
         throw_unless(111, msg_value >= gas::jetton_transfer); ;; gas for transaction
 
@@ -187,9 +217,11 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
     }
 
     if (op == op::transfer_notification) {
-        throw_unless(97, equal_slices(user,storage::jetton_wallet_address));
+        throw_unless(97, equal_slices(user,storage::jetton_proxy));
+
         int transferred_jettons = in_msg_body~load_coins();
         slice from_address = in_msg_body~load_msg_addr();
+
         throw_unless(98, equal_slices(from_address, storage::owner_address));
 
         slice ds = in_msg_body~load_ref().begin_parse();
@@ -202,6 +234,15 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
         add_commission(time,transferred_jettons, total_in_stake);
 
         return();
+    }
+
+    if (op == op::take_wallet_address) {  ;; change jetton wallet address (used only once)
+        slice reported_wallet_address = in_msg_body~load_msg_addr();
+        if (equal_slices(user, storage::jetton_wallet_address)) {
+            storage::jetton_proxy = reported_wallet_address;
+        }
+        save_data();
+        return ();
     }
 
     if (op == 0xfffe) { 
@@ -248,4 +289,9 @@ cell get_nft_item_code() method_id {
 slice get_collection_adress() method_id {
     load_data();
     return storage::collection_address;
+}
+
+slice get_proxy_address() method_id {
+    load_data();
+    return storage::jetton_proxy;
 }

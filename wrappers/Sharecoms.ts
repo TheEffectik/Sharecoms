@@ -10,15 +10,21 @@ export type SharecomsConfig = { // need to change
 
 export function SharecomsConfigToCell(config: SharecomsConfig): Cell { // need to change 
     return beginCell()
-                .storeInt(config.last_commission_time, 256)
+                .storeUint(0, 1)
+                .storeUint(config.last_commission_time, 32)
                 .storeRef(
                     beginCell()
                     .storeAddress(config.jetton_wallet_address)
-                    .storeAddress(config.owner_address)
-                    .storeAddress(config.collection_address)
+                    .storeAddress(config.jetton_wallet_address) 
                     .endCell()
                 )
-                .storeRef(config.nft_item_code) // address for distribution part of income to JVT holders
+                .storeRef(
+                    beginCell()
+                    .storeAddress(config.owner_address)
+                    .storeAddress(config.collection_address)
+                    .storeRef(config.nft_item_code) // address for distribution part of income to JVT holders
+                    .endCell()
+                )
                 .storeDict()
                 .storeDict()   
                 .endCell();
