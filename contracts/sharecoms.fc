@@ -104,8 +104,6 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
     (int wc, int user_id) = parse_std_addr(user);
     throw_unless(333, wc == 0);
 
-    throw(123);
-    
     (slice dict_value, int success) = storage::users_dict.udict_get?(256, user_id);
 
     ifnot (success){
@@ -113,19 +111,22 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
         storage::users_dict.udict_set(256, user_id, begin_cell().store_uint(last_commision, 32).end_cell().begin_parse());
     }
 
-    (slice dict_value, int success) = storage::users_dict.udict_get?(256, user_id);
+    (slice dict_value, _) = storage::users_dict.udict_get?(256, user_id);
+    if(dict_value.slice_empty?()) {
+        throw(100);
+    }
     int last_ptr = dict_value~load_uint(32);
+    throw(123);
 
     (slice commision_dict_value, _) = storage::commission_dict.udict_get?(32, last_ptr);
 
     int last_sum  = commision_dict_value~load_uint(256); ;; last sum wich user didnt claim
     
-    (slice commision_dict_value, _) = storage::commission_dict.udict_get?(32, storage::last_commission_time);
+    (commision_dict_value, _) = storage::commission_dict.udict_get?(32, storage::last_commission_time);
 
     int curr_sum  = commision_dict_value~load_uint(256); ;; current sum
 
     int jetton_amount = muldiv(curr_sum - last_sum, amount_in_stake, bignumber);
-
     send_jettons(query_id, jetton_amount, user, storage::jetton_wallet_address, 0, 64, 1);
 
     storage::users_dict.udict_set(256, user_id, begin_cell().store_uint(storage::last_commission_time, 32).end_cell().begin_parse());
@@ -248,7 +249,3 @@ slice get_collection_adress() method_id {
     load_data();
     return storage::collection_address;
 }
-
-
-
-
