@@ -323,6 +323,31 @@ int last_sum() method_id {
     return curr_sum;
 }
 
+int get_rewards_for_user(int user_id) method_id {
+    load_data();
+    
+    (slice dict_value, int success) = storage::users_dict.udict_get?(256, user_id);
+
+    ifnot (success) {
+        return 0;
+    }
+    else { 
+        int last_ptr = dict_value~load_uint(32);
+    }
+    int last_ptr = dict_value~load_uint(32);
+
+    (slice commision_dict_value, _) = storage::commission_dict.udict_get?(32, last_ptr);
+
+    int last_sum  = commision_dict_value~load_uint(256); ;; last sum wich user didnt claim
+    
+    (commision_dict_value, _) = storage::commission_dict.udict_get?(32, storage::last_commission_time);
+
+    int curr_sum  = commision_dict_value~load_uint(256); ;; current sum
+
+    int jetton_amount = muldiv(curr_sum - last_sum, amount_in_stake, bignumber);
+
+    return jetton_amount;
+}
 int get_last_commission_time() method_id {
     load_data();
     return storage::last_commission_time;
