@@ -117,15 +117,14 @@ slice calculate_address_by_index(slice collection_address, cell nft_item_code, i
 
     (slice dict_value, int success) = storage::users_dict.udict_get?(256, user_id);
 
-    ifnot (success){
-        (int last_commision, _, _) = storage::commission_dict.udict_get_nexteq?(32, time_nft);
+    int last_ptr = 0;
+    if (success){
+        last_ptr = dict_value~load_uint(32);
+    }
+    else { 
+        (last_ptr, _, _) = storage::commission_dict.udict_get_preveq?(32, time_nft);
         storage::users_dict~udict_set(256, user_id, begin_cell().store_uint(last_commision, 32).end_cell().begin_parse());
     }
-
-    (slice dict_value, int success) = storage::users_dict.udict_get?(256, user_id);
-    throw_unless(100, success);
-
-    int last_ptr = dict_value~load_uint(32);
 
     (slice commision_dict_value, _) = storage::commission_dict.udict_get?(32, last_ptr);
 
@@ -323,7 +322,7 @@ int last_sum() method_id {
     return curr_sum;
 }
 
-int get_rewards_for_user(int user_id) method_id {
+int get_last_user_claiming(int user_id) method_id {
     load_data();
     
     (slice dict_value, int success) = storage::users_dict.udict_get?(256, user_id);
@@ -333,10 +332,14 @@ int get_rewards_for_user(int user_id) method_id {
     }
     else { 
         int last_ptr = dict_value~load_uint(32);
+        return last_ptr;
     }
-    int last_ptr = dict_value~load_uint(32);
+}
 
-    (slice commision_dict_value, _) = storage::commission_dict.udict_get?(32, last_ptr);
+int get_rewards_by_time(int time) method_id {
+    (int last_commision, _, _) = storage::commission_dict.udict_get_preveq?(32, time_nft);
+
+    (slice commision_dict_value, _) = storage::commission_dict.udict_get?(32, last_commision);
 
     int last_sum  = commision_dict_value~load_uint(256); ;; last sum wich user didnt claim
     
@@ -344,10 +347,9 @@ int get_rewards_for_user(int user_id) method_id {
 
     int curr_sum  = commision_dict_value~load_uint(256); ;; current sum
 
-    int jetton_amount = muldiv(curr_sum - last_sum, amount_in_stake, bignumber);
-
-    return jetton_amount;
+    return muldiv(curr_sum - last_sum, amount_in_stake, bignumber);
 }
+
 int get_last_commission_time() method_id {
     load_data();
     return storage::last_commission_time;
